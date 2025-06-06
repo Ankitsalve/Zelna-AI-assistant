@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios, { AxiosError } from 'axios'; 
 import { 
   StyleSheet, 
   TextInput, 
@@ -6,48 +7,100 @@ import {
   TouchableOpacity, 
   KeyboardAvoidingView, 
   Platform, 
-  ScrollView 
+  ScrollView, 
+  Text
 } from 'react-native';
-import { Text } from '@/components/Themed';
-import { Ionicons } from '@expo/vector-icons'; 
+import { Ionicons } from '@expo/vector-icons';
+
+// Define the message type
+type Message = {
+  text: string;
+  sender: 'user' | 'ai';
+};
 
 export default function TabOneScreen() {
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<string[]>([]); // Store messages
+  const [messages, setMessages] = useState<Message[]>([]); 
+  const GEMINI_API_KEY = 'AIzaSyCOMD35ZQdP09IUSQNdeTxOyNVjz9Cu358'; 
 
-  // Handle sending a message
-  const handleSend = () => {
+  const handleSend = async () => {
     if (inputText.trim()) {
-      setMessages([...messages, inputText]); // Add message to chat
-      setInputText(''); // Clear input field
+      
+      setMessages((prevMessages) => [...prevMessages, { text: inputText, sender: 'user' }]);
+      setInputText('');
+
+      try {
+       
+        const response = await axios.post( `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            contents: [{
+              parts: [{
+                text: inputText 
+              }]
+            }]
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        
+        console.log("Gemini API Response:", response.data);
+
+        const content = response.data.candidates?.[0]?.content;
+        console.log("Content field:", content); 
+       
+        const aiResponse = content?.parts?.[0]?.text || 'Sorry, I didn’t understand that.';
+        
+       
+        if (!aiResponse) {
+          console.error('No valid text in the response:', response.data);
+        }
+
+        setMessages((prevMessages) => [...prevMessages, { text: aiResponse, sender: 'ai' }]);
+      } catch (error) {
+      
+        if (error instanceof AxiosError) {
+          console.error('Error fetching from Gemini API:', error.response ? error.response.data : error.message);
+          setMessages((prevMessages) => [...prevMessages, { text: 'Error processing message', sender: 'ai' }]);
+        } else {
+          console.error('Unknown error:', error);
+          setMessages((prevMessages) => [...prevMessages, { text: 'Unexpected error occurred', sender: 'ai' }]);
+        }
+      }
     }
   };
 
-  // Handle clearing the chat
+
   const handleClearChat = () => {
-    setMessages([]); // Reset messages to empty
+    setMessages([]); 
   };
 
   return (
     <View style={styles.container}>
-      {/* Clear Chat Button */}
+    
       <TouchableOpacity style={styles.clearButton} onPress={handleClearChat}>
-      <Ionicons name="trash" size={24} color="white" />
+        <Ionicons name="trash" size={24} color="white" />
       </TouchableOpacity>
 
-      {/* Title */}
       <Text style={styles.title}>Zelna AI Assistant</Text>
 
-      {/* Chat Messages Container */}
       <ScrollView style={styles.chatContainer} contentContainerStyle={{ paddingBottom: 20 }}>
         {messages.map((msg, index) => (
-          <View key={index} style={styles.userMessage}>
-            <Text style={styles.userText}>{msg}</Text>
+          <View
+            key={index}
+            style={[
+              styles.messageContainer,
+              msg.sender === 'user' ? styles.userMessage : styles.aiMessage,
+            ]}
+          >
+            <Text style={styles.messageText}>{msg.text}</Text>
           </View>
         ))}
       </ScrollView>
 
-      {/* Input & Send Button */}
       <KeyboardAvoidingView 
         behavior={Platform.OS === "android" ? "padding" : "height"}
         style={styles.inputContainer}
@@ -88,16 +141,21 @@ const styles = StyleSheet.create({
     marginBottom: 17,
     marginTop: 17, 
   },
-  userMessage: {
-    alignSelf: 'flex-end', 
-    backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 15,
+  messageContainer: {
     marginVertical: 5,
     maxWidth: '70%',
-    marginLeft: 'auto', 
+    padding: 12,
+    borderRadius: 15,
   },
-  userText: {
+  userMessage: {
+    backgroundColor: '#007AFF', // User messages on the right
+    alignSelf: 'flex-end',
+  },
+  aiMessage: {
+    backgroundColor: '#FFC107', // AI messages on the left
+    alignSelf: 'flex-start',
+  },
+  messageText: {
     color: 'white',
     fontSize: 16,
   },
@@ -129,5 +187,4 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     marginBottom: 10,
   },
-  
 });
