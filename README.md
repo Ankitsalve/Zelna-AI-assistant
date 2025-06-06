@@ -21,3 +21,5 @@ cd zelna
 npm install
 npx expo start
 
+![Zelna Home Screen](screenshots/home.jpg)
+![Zelna Chat Screen](screenshots/chat.jpg)
